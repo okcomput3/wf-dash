@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<wayfire>
+    <plugin name="shader-dock">
+        <_short>Shader Dock</_short>
+        <_long>A dock panel with shader-based icon effects including bevel, shimmer, and 3D button styling.</_long>
+        <category>Desktop</category>
+
+        <option name="apps" type="string">
+            <_short>Applications</_short>
+            <_long>Space-separated list of application IDs (desktop file names without .desktop extension) to show in the dock</_long>
+            <default>firefox thunar kitty</default>
+        </option>
+
+        <option name="icon_size" type="int">
+            <_short>Icon Size</_short>
+            <_long>Size of dock icons in pixels</_long>
+            <default>64</default>
+            <min>24</min>
+            <max>256</max>
+        </option>
+
+        <option name="spacing" type="int">
+            <_short>Icon Spacing</_short>
+            <_long>Space between icons in pixels</_long>
+            <default>8</default>
+            <min>0</min>
+            <max>64</max>
+        </option>
+
+        <option name="margin" type="int">
+            <_short>Margin</_short>
+            <_long>Margin around the dock in pixels</_long>
+            <default>8</default>
+            <min>0</min>
+            <max>64</max>
+        </option>
+
+        <option name="corner_radius" type="double">
+            <_short>Corner Radius</_short>
+            <_long>Radius of rounded corners for icons</_long>
+            <default>12.0</default>
+            <min>0.0</min>
+            <max>64.0</max>
+        </option>
+
+        <option name="bevel_color" type="color">
+            <_short>Bevel Color</_short>
+            <_long>Color of the bevel/shimmer effect on icons</_long>
+            <default>0.8 0.7 0.5 0.6</default>
+        </option>
+
+        <option name="background_color" type="color">
+            <_short>Background Color</_short>
+            <_long>Background color of the dock panel</_long>
+            <default>0.1 0.1 0.1 0.85</default>
+        </option>
+    </plugin>
+</wayfire>
