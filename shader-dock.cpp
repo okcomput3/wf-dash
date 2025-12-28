@@ -1,8 +1,9 @@
 /**
  * Wayfire Shader Dock Plugin
- * 
+ * copyright andrew pliatsikas
  * A dock/panel plugin that renders application icons with bevel/shimmer/3D effects.
  * Uses custom OpenGL shaders rendered directly to output framebuffer.
+ * MIT lincense
  */
 
 #include <wayfire/plugin.hpp>
