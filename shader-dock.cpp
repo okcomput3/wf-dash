@@ -1,9 +1,8 @@
 /**
  * Wayfire Shader Dock Plugin
- * copyright andrew pliatsikas
+ * 
  * A dock/panel plugin that renders application icons with bevel/shimmer/3D effects.
  * Uses custom OpenGL shaders rendered directly to output framebuffer.
- * MIT lincense
  */
 
 #include <wayfire/plugin.hpp>
@@ -34,6 +33,9 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <png.h>
+#include <linux/input-event-codes.h>
+
+extern char **environ;
 
 namespace shader_dock
 {
@@ -312,7 +314,7 @@ bool load_png_texture(const std::string& path, GLuint& texture_id, int& width, i
     return true;
 }
 
-std::string find_icon_path(const std::string& icon_name, int size)
+std::string find_icon_path(const std::string& icon_name, [[maybe_unused]] int size)
 {
     std::vector<std::string> theme_dirs = {
         "/usr/share/icons/hicolor",
@@ -390,6 +392,34 @@ bool parse_desktop_file(const std::string& app_id, DockIcon& icon)
     return !icon.exec.empty();
 }
 
+void launch_application(const std::string& exec_cmd)
+{
+    LOGD("shader-dock: launching '", exec_cmd, "'");
+    
+    pid_t pid = fork();
+    if (pid == 0) {
+        // Child process
+        // Detach from parent process group
+        setsid();
+        
+        // Close file descriptors
+        for (int fd = 3; fd < 256; fd++) {
+            close(fd);
+        }
+        
+        // Execute via shell for proper parsing
+        execl("/bin/sh", "sh", "-c", exec_cmd.c_str(), nullptr);
+        
+        // If exec fails, exit child
+        _exit(127);
+    } else if (pid > 0) {
+        // Parent - don't wait, let the child run independently
+        LOGD("shader-dock: spawned process ", pid);
+    } else {
+        LOGD("shader-dock: fork failed");
+    }
+}
+
 // ============================================================================
 // Main Plugin
 // ============================================================================
@@ -423,6 +453,12 @@ class ShaderDockPlugin : public wf::per_output_plugin_instance_t
         [=] (wf::output_configuration_changed_signal*) {
             update_geometry();
             output->render->damage_whole();
+        };
+
+    // Pointer button signal connection
+    wf::signal::connection_t<wf::post_input_event_signal<wlr_pointer_button_event>> on_button =
+        [=] (wf::post_input_event_signal<wlr_pointer_button_event> *ev) {
+            handle_button(ev->event);
         };
 
   public:
@@ -471,6 +507,9 @@ class ShaderDockPlugin : public wf::per_output_plugin_instance_t
         output->render->add_effect(&damage_hook, wf::OUTPUT_EFFECT_DAMAGE);
         output->render->add_effect(&overlay_hook, wf::OUTPUT_EFFECT_OVERLAY);
         output->connect(&on_output_changed);
+        
+        // Connect to pointer button events
+        wf::get_core().connect(&on_button);
 
         animation_timer.set_timeout(16, [this] () {
             output->render->damage(dock_geometry);
@@ -479,6 +518,27 @@ class ShaderDockPlugin : public wf::per_output_plugin_instance_t
 
         output->render->damage_whole();
         LOGD("shader-dock: initialized with ", icons.size(), " icons");
+    }
+
+    void handle_button(wlr_pointer_button_event *event)
+    {
+        auto cursor = wf::get_core().get_cursor_position();
+        
+        LOGD("shader-dock: button event - button=", event->button, 
+             " state=", event->state, " cursor=(", cursor.x, ",", cursor.y, ")");
+        
+        // Only handle left click release
+        if (event->button != BTN_LEFT || event->state != WLR_BUTTON_RELEASED) {
+            return;
+        }
+        
+        int clicked = get_icon_at(cursor.x, cursor.y);
+        LOGD("shader-dock: left click release, icon index=", clicked);
+        
+        if (clicked >= 0 && clicked < (int)icons.size()) {
+            LOGD("shader-dock: launching '", icons[clicked].exec, "'");
+            launch_application(icons[clicked].exec);
+        }
     }
 
     void update_geometry()
@@ -511,7 +571,7 @@ class ShaderDockPlugin : public wf::per_output_plugin_instance_t
         int idx = ly / (icon_size + spacing);
         int off = ly % (icon_size + spacing);
         if (idx >= 0 && idx < (int)icons.size() && off < icon_size) {
-            // Invert index to match visual order
+            // Reverse index to match visual order (icons render bottom-to-top in array)
             return (int)icons.size() - 1 - idx;
         }
         return -1;
@@ -698,6 +758,7 @@ class ShaderDockPlugin : public wf::per_output_plugin_instance_t
         animation_timer.disconnect();
         output->render->rem_effect(&damage_hook);
         output->render->rem_effect(&overlay_hook);
+        on_button.disconnect();
 
         for (auto& icon : icons)
             if (icon.texture_id) glDeleteTextures(1, &icon.texture_id);
